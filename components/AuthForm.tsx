@@ -1,76 +1,3 @@
-// "use client"
-
-// import { zodResolver } from "@hookform/resolvers/zod"
-// import { useForm } from "react-hook-form"
-// import { z } from "zod"
-// import Image from "next/image"
-
-// import { Button } from "@/components/ui/button"
-// import {
-//   Form,
-//   FormControl,
-//   FormDescription,
-//   FormField,
-//   FormItem,
-//   FormLabel,
-//   FormMessage,
-// } from "@/components/ui/form"
-// import { Input } from "@/components/ui/input"
-
-// const formSchema = z.object({
-//   username: z.string().min(2).max(50),
-// })
-// const AuthForm = () => {
-//     // 1. Define your form.
-//   const form = useForm<z.infer<typeof formSchema>>({
-//     resolver: zodResolver(formSchema),
-//     defaultValues: {
-//       username: "",
-//     },
-//   })
- 
-//   // 2. Define a submit handler.
-//   function onSubmit(values: z.infer<typeof formSchema>) {
-//     // Do something with the form values.
-//     // ✅ This will be type-safe and validated.
-//     console.log(values)
-//   }
-//   return (
-//     <div className="card-border lg:min-w-[566px]">
-//       <div className="flex flex-col gap-6 card py-14 px-10">
-//         <div className="flex flex-row gap-2 justify-center">
-//           <Image src="/logo.svg" alt="logo" width={32} height={32}/>
-//         </div>
-//       </div>
-//       <Form {...form}>
-//       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-//         <FormField
-//           control={form.control}
-//           name="username"
-//           render={({ field }) => (
-//             <FormItem>
-//               <FormLabel>Username</FormLabel>
-//               <FormControl>
-//                 <Input placeholder="shadcn" {...field} />
-//               </FormControl>
-//               <FormDescription>
-//                 This is your public display name.
-//               </FormDescription>
-//               <FormMessage />
-//             </FormItem>
-//           )}
-//         />
-//         <Button type="submit">Submit</Button>
-//       </form>
-//     </Form>
-//     </div>
-//   )
-// }
-
-// export default AuthForm
-
-
-
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -84,6 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Form, FormField } from "@/components/ui/form"
 import CustomFormField from "./FormField"
 import { useRouter } from "next/navigation"
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
+import { auth } from "@/firebase/client"
+import { signIn, signUp } from "@/lib/actions/auth.action"
 
 
 
@@ -109,12 +39,35 @@ const AuthForm = ({type}:{type: FormType}) => {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     try{
       if (type === "sign-up") {
+        const {name, email, password} = values;
+        const userCredentials = await createUserWithEmailAndPassword(auth, email, password)
+        const result = await signUp({
+          uid: userCredentials.user.uid,
+          name: name!,
+          email,
+          password
+        })
+        if(!result?.success){
+          toast.error(result.message);
+          return;
+        }
         toast.success("Account created successfully! please Sign In");
         router.push("/sign-in");
       }else{
+        const {email, password} = values;
+        const userCredentials = await signInWithEmailAndPassword(auth, email, password);
+        const idToken = await userCredentials.user.getIdToken();
+        if(!idToken){
+          toast.error('Sign In failed, please try again');
+          return;
+        }
+        await signIn({
+          email,
+          idToken
+        });
         toast.success("Signed in successfully!");
         router.push("/");
       }
